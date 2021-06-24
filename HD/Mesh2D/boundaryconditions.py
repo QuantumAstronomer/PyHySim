@@ -83,7 +83,8 @@ class BC(object):
             Parameters:
         -------------------
 
-        xlb : {"outflow", "periodic", "reflect", "reflect-even",
+        xlb : string
+              {"outflow", "periodic", "reflect", "reflect-even",
                "reflect-odd", "dirichlet", "neumann",
                user-defined}, optional
 
@@ -91,7 +92,8 @@ class BC(object):
                user-defined requires one to have adefined a new boundary condition
                type using the define_bc function.
 
-        xrb : {"outflow", "periodic", "reflect", "reflect-even",
+        xrb : string
+              {"outflow", "periodic", "reflect", "reflect-even",
                "reflect-odd", "dirichlet", "neumann",
                user-defined}, optional
 
@@ -99,7 +101,8 @@ class BC(object):
                user-defined requires one to have adefined a new boundary condition
                type using the define_bc function.
 
-        ylb : {"outflow", "periodic", "reflect", "reflect-even",
+        ylb : string
+              {"outflow", "periodic", "reflect", "reflect-even",
                "reflect-odd", "dirichlet", "neumann",
                user-defined}, optional
 
@@ -107,7 +110,8 @@ class BC(object):
                user-defined requires one to have adefined a new boundary condition
                type using the define_bc function.
 
-        yrb : {"outflow", "periodic", "reflect", "reflect-even",
+        yrb : string
+              {"outflow", "periodic", "reflect", "reflect-even",
                "reflect-odd", "dirichlet", "neumann",
                user-defined}, optional
 
