@@ -34,9 +34,9 @@ class ExtendedArray(np.ndarray):
     """
 
     def __new__(self, data, grid = None):
-        arr = np.asarray(d).view(self)
+        arr = np.asarray(data).view(self)
         arr.g = grid
-        arr.c = len(d.shape)
+        arr.c = len(data.shape)
 
         return arr
 
