@@ -3,7 +3,6 @@ This file contains methods that aid in managing boundary conditions of the grid
 """
 
 from __future__ import print_function
-from util import msg
 
 ## Defining a dictionary to keep track whether or not a boundary condition is solid or not.
 ## Solid boundaries do not allow flux through the boundary, i.e. it is a solid wall
@@ -160,7 +159,7 @@ class BC(object):
             if self.xlb == "reflect":
                 self.xlb = _set_reflect(odd_dir, "x")
         else:
-            msg.fail("ERROR: xlb = %s is an invalid BC" % (xlb))
+            raise ValueError("xlb = %s is an invalid BC" % (xlb))
 
         ## Check upper x-bondary
         if xrb in valid:
@@ -168,7 +167,7 @@ class BC(object):
             if self.xrb == "reflect":
                 self.xrb = _set_reflect(odd_dir, "x")
         else:
-            msg.fail("ERROR: xrb = %s is an invalid BC" % (xrb))
+            raise ValueError("xrb = %s is an invalid BC" % (xrb))
 
         ## Check lower y-boundary
         if ylb in valid:
@@ -176,7 +175,7 @@ class BC(object):
             if self.ylb == "reflect":
                 self.ylb = _set_reflect(odd_dir, "y")
         else:
-            msg.fail("ERROR: ylb = %s is an invalid BC" % (ylb))
+            raise ValueError("ylb = %s is an invalid BC" % (ylb))
 
         ## Check upper y-boundary
         if yrb in valid:
@@ -184,15 +183,15 @@ class BC(object):
             if self.yrb == "reflect":
                 self.yrb = _set_reflect(odd_dir, "y")
         else:
-            msg.fail("ERROR: yrb = %s is an invalid BC" % (yrb))
+            raise ValueError("yrb = %s is an invalid BC" % (yrb))
 
         ## Checking periodic boundaries for consistency
         if ((xlb == "periodic" and xrb != "periodic") or
             (xrb == "periodic" and xlb != "periodic")):
-            msg.fail("ERROR both x-boundaries must be periodic")
+            raise TypeError("both x-boundaries must be periodic")
         if ((ylb == "periodic" and yrb != "periodic") or
             (yrb == "periodic" and ylb != "periodic")):
-            msg.fail("ERROR both y-boundaries must be periodic")
+            raise TypeError("both y-boundaries must be periodic")
 
 
         ## Inhomogeneous functions for Dirichlet or Neumann boundary conditions

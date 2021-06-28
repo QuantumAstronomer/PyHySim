@@ -10,10 +10,9 @@ Typical usage to initialize any data onto the grid may lool like:
 from __future__ import print_function
 import numpy as np
 import h5py
-from util import msg
 
-import Mesh2D.boundaryconditions as bcs
-import Mesh2D.extendedarray as ea
+import mesh2d.boundaryconditions as bcs
+import mesh2d.extendedarray as ea
 
 class Grid2D(object):
     """
@@ -207,13 +206,13 @@ class CellCenterData2D(object):
         """
 
         if self.initialized == 1:
-            msg.fail("ERROR: grid already initialized")
+            raise TypeError("grid already initialized")
 
         self.varnames.append(name)
         self.nvars += 1
         self.BCs[name] = bc
 
-    def.set_auxiliary(self, keyword, value):
+    def set_auxiliary(self, keyword, value):
         """
         Set any auxiliary (scalar) data. This data is typically a constant
         that is carried along with the CellCenterData2D object. To be able
@@ -261,7 +260,7 @@ class CellCenterData2D(object):
         """
 
         if self.initialized == 1:
-            msg.fail("ERROR: Grid has already been initialized")
+            TypeError("Grid has already been initialized")
 
         self.data = ea.ExtendedArray(data = np.zeros(shape = (self.grid.qx, self.grid.qy, self.nvars),
                                                      dtype = self.dtype),
@@ -384,7 +383,7 @@ class CellCenterData2D(object):
         elif keyword in self.auxiliary.keys():
             return self.auxiliary[keyword]
         else:
-            msg.fail("ERROR: keyword not found in auxiliary data.")
+            raise KeyError("keyword not found in auxiliary data.")
 
     def set_zeros(self, name):
         """
