@@ -159,7 +159,7 @@ class ExtendedArray(np.ndarray):
         if not nodal:
             L = self[self.g.ilo : self.g.ilo + self.g.nx // 2,
                      self.g.jlo : self.g.jhi + 1]
-            R = self[self.g.ilo + self.g.nx // 2 : self.g.ihi + 1
+            R = self[self.g.ilo + self.g.nx // 2 : self.g.ihi + 1,
                      self.g.jlo : self.g.jhi + 1]
         elif nodal:
             L = self[self.g.ilo : self.g.ilo + self.g.nx // 2 + 1,
@@ -309,7 +309,7 @@ class ExtendedArray(np.ndarray):
             if self.dtype == np.int:
                 fmt = "%4d"
             elif self.dtype == np.float64:
-                fmt = "8.5g%""
+                fmt = "8.5g%"
             else:
                 raise ValueError("ERROR: dtype not supported")
 

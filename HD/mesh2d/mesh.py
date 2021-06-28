@@ -11,8 +11,8 @@ from __future__ import print_function
 import numpy as np
 import h5py
 
-import mesh2d.boundaryconditions as bcs
-import mesh2d.extendedarray as ea
+import boundaryconditions as bcs
+import extendedarray as ea
 
 class Grid2D(object):
     """
