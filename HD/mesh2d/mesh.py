@@ -213,7 +213,7 @@ class CellCenterData2D(object):
         self.nvars += 1
         self.BCs[name] = bc
 
-    def set_auxiliary(self, keyword, value):
+    def.set_auxiliary(self, keyword, value):
         """
         Set any auxiliary (scalar) data. This data is typically a constant
         that is carried along with the CellCenterData2D object. To be able
