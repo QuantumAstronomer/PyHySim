@@ -151,7 +151,7 @@ class BC(object):
                or Neumann boundary conditions.
         """
 
-        valid = list(is_sold.keys())
+        valid = list(is_solid.keys())
 
         ## Check lower x-boundary
         if xlb in valid:

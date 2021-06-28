@@ -101,7 +101,7 @@ class Grid2D(object):
         self.yc = .5 * (self.yl + self.yr)
 
         ## 2D versions of the zone-coordinates
-        self.y2d, self.x2d = np.meshgrid(yc, xc)
+        self.y2d, self.x2d = np.meshgrid(self.yc, self.xc)
 
     def scratch_array(self, nvar = 1):
         """
@@ -281,8 +281,8 @@ class CellCenterData2D(object):
         output_string += "                   Variable names:\n"
 
         for n in range(self.nvars):
-            output_string += "{:16s}: min = {:15.10f},    max = {:15.10f}\n".format(
-                              self.varnames[n], self.min(self.varnames[n], self.max(self.varnames[n])))
+            output_string += "{:16s} min = {:15.10f},    max = {:15.10f}\n".format(
+                              self.varnames[n], self.min(self.varnames[n]), self.max(self.varnames[n]))
             output_string += "{:16s} BCs: -x = {:12s}, +x = {:12s}, -y = {:12s}, +y = {:12s}".format(
                               "", self.BCs[self.varnames[n]].xlb, self.BCs[self.varnames[n]].xrb,
                                   self.BCs[self.varnames[n]].ylb, self.BCs[self.varnames[n]].yrb)
@@ -310,7 +310,7 @@ class CellCenterData2D(object):
         """
 
         try:
-            n = self.names.index(name)
+            n = self.varnames.index(name)
         except ValueError:
             for func in self.derived:
                 try:
@@ -422,38 +422,38 @@ class CellCenterData2D(object):
         """
 
         ## Handle all pre-defined boundary conditions in this way.
-        n = self.names.index(name)
+        n = self.varnames.index(name)
         self.data.fillghost(nc = n, bc = self.BCs[name])
 
         ## If a user-defined (custom) boundary condition must be used
         ## this will be handled explicitly here.
-        if self.BCs[name].xlb in bc.extra_boundaries.keys():
+        if self.BCs[name].xlb in bcs.extra_boundaries.keys():
             try:
-                bc.extra_boundaries[self.BCs[name].xlb](self.BCs[name].xlb,
+                bcs.extra_boundaries[self.BCs[name].xlb](self.BCs[name].xlb,
                                                         "xlb", name, self, self.ivars)
             except TypeError:
-                bc.extra_boundaries[self.BCs[name].xlb](self.BCs[name].xlb,
+                bcs.extra_boundaries[self.BCs[name].xlb](self.BCs[name].xlb,
                                                         "xlb", name, self)
-        if self.BCs[name].xrb in bc.extra_boundaries.keys():
+        if self.BCs[name].xrb in bcs.extra_boundaries.keys():
             try:
-                bc.extra_boundaries[self.BCs[name].xrb](self.BCs[name].xrb,
+                bcs.extra_boundaries[self.BCs[name].xrb](self.BCs[name].xrb,
                                                         "xrb", name, self, self.ivars)
             except TypeError:
-                bc.extra_boundaries[self.BCs[name].xrb](self.BCs[name].xrb,
+                bcs.extra_boundaries[self.BCs[name].xrb](self.BCs[name].xrb,
                                                         "xrb", name, self)
-        if self.BCs[name].ylb in bc.extra_boundaries.keys():
+        if self.BCs[name].ylb in bcs.extra_boundaries.keys():
             try:
-                bc.extra_boundaries[self.BCs[name].ylb](self.BCs[name].ylb,
+                bcs.extra_boundaries[self.BCs[name].ylb](self.BCs[name].ylb,
                                                         "ylb", name, self, self.ivars)
             except TypeError:
-                bc.extra_boundaries[self.BCs[name].ylb](self.BCs[name].ylb,
+                bcs.extra_boundaries[self.BCs[name].ylb](self.BCs[name].ylb,
                                                         "ylb", name, self)
-        if self.BCs[name].yrb in bc.extra_boundaries.keys():
+        if self.BCs[name].yrb in bcs.extra_boundaries.keys():
             try:
-                bc.extra_boundaries[self.BCs[name].yrb](self.BCs[name].yrb,
+                bcs.extra_boundaries[self.BCs[name].yrb](self.BCs[name].yrb,
                                                         "yrb", name, self, self.ivars)
             except TypeError:
-                bc.extra_boundaries[self.BCs[name].yrb](self.BCs[name].yrb,
+                bcs.extra_boundaries[self.BCs[name].yrb](self.BCs[name].yrb,
                                                         "yrb", name, self)
     def min(self, name, ng = 0):
         """
@@ -464,7 +464,7 @@ class CellCenterData2D(object):
         n = self.varnames.index(name)
         return np.min(self.data.valid(nc = n, nbuf = ng))
 
-    def max(self, name, ng):
+    def max(self, name, ng = 0):
         """
         Return the maximum of the variable name in the domains valid region.
         Except when ng > 0, then ghostcells will be included
@@ -491,17 +491,17 @@ class CellCenterData2D(object):
         cdata       = coarse_grid.scratch_array()
 
         if N == 2:
-            cdata.valid()[:, :] = .25 * (fdata.valid(s = 2) + fdata.ishift(1, s = 2) +
-                                         fdata.jshift(1, s = 2) + fdata.ijshift(1, 1, s = 2))
+            cdata.valid()[:, :] = .25 * (fdata.valid(step = 2) + fdata.ishift(1, step = 2) +
+                                         fdata.jshift(1, step = 2) + fdata.ijshift(1, 1, step = 2))
         elif N == 4:
-            cdata.valid()[:, :] = 1/16 * (fdata.valid(s = 4) + fdata.ishift(1, s = 4) +
-                                          fdata.ishift(2, s = 4) + fdata.ishift(3, s = 4) +
-                                          fdata.jshift(1, s = 4) + fdata.jshift(2, s = 4) +
-                                          fdata.jshift(3, s = 4) + fdata.ijshift(1, 1, s = 4) +
-                                          fdata.ijshift(1, 2, s = 4) + fdata.ijshift(1, 3, s = 4) +
-                                          fdata.ijshift(2, 1, s = 4) + fdata.ijshift(3, 1, s = 4) +
-                                          fdata.ijshift(2, 2, s = 4) + fdata.ijshift(3, 2, s = 4) +
-                                          fdata.ijshift(2, 3, s = 4) + fdata.ijshfit(3, 3, s = 4))
+            cdata.valid()[:, :] = 1/16 * (fdata.valid(step = 4) + fdata.ishift(1, step = 4) +
+                                          fdata.ishift(2, step = 4) + fdata.ishift(3, step = 4) +
+                                          fdata.jshift(1, step = 4) + fdata.jshift(2, step = 4) +
+                                          fdata.jshift(3, step = 4) + fdata.ijshift(1, 1, step = 4) +
+                                          fdata.ijshift(1, 2, step = 4) + fdata.ijshift(1, 3, step = 4) +
+                                          fdata.ijshift(2, 1, step = 4) + fdata.ijshift(3, 1, step = 4) +
+                                          fdata.ijshift(2, 2, step = 4) + fdata.ijshift(3, 2, step = 4) +
+                                          fdata.ijshift(2, 3, step = 4) + fdata.ijshfit(3, 3, step = 4))
         else:
             raise ValueError("Restriction is only allowed by a factor 2 or 4")
 
@@ -545,15 +545,15 @@ class CellCenterData2D(object):
 
         ## Slopes for the coarse data
         m_x = coarse_grid.scratch_array()
-        m_x.valid()[:, :] = .5 * (cdata.ishift(1) + cdata.ishfit(-1))
+        m_x.valid()[:, :] = .5 * (cdata.ishift(1) + cdata.ishift(-1))
         m_y = coarse_grid.scratch_array()
         m_y.valid()[:, :] = .5 * (cdata.jshift(1) + cdata.jshift(-1))
 
         ## Filling the children cells in order of 1, 2, 3, 4
-        fdata.valid(s = 2)[:, :] = cdata.valid() - .25 * m_x.valid() - .25 * m_y.valid()
-        fdata.ishift(1, s = 2)[:, :] = cdata.valid() + .25 * m_x.valid() - .25 * m_y.valid()
-        fdata.jshift(1, s = 2)[:, :] = cdata.valid() - .25 * m_x.valid() + .25 * m_y.valid()
-        fdata.ijshfit(1, 1, s = 2)[:, :] = cdata.valid() + .25 * m_x.valid() + .25 * m_y.valid()
+        fdata.valid(step = 2)[:, :] = cdata.valid() - .25 * m_x.valid() - .25 * m_y.valid()
+        fdata.ishift(1, step = 2)[:, :] = cdata.valid() + .25 * m_x.valid() - .25 * m_y.valid()
+        fdata.jshift(1, step = 2)[:, :] = cdata.valid() - .25 * m_x.valid() + .25 * m_y.valid()
+        fdata.ijshift(1, 1, step = 2)[:, :] = cdata.valid() + .25 * m_x.valid() + .25 * m_y.valid()
 
         return fdata
 

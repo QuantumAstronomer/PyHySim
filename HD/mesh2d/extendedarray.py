@@ -89,11 +89,11 @@ class ExtendedArray(np.ndarray):
         c = len(self.shape)
 
         if c == 2:
-            return np.asarray(self[self.g.ilo - bxlo + ishift : self.g.ihi + bxhi + ishift + 1 : s,
-                                   self.g.jlo - bylo + jshift : self.g.jhi + byhi + jshift + 1 : s])
+            return np.asarray(self[self.g.ilo - bxlo + ishift : self.g.ihi + bxhi + ishift + 1 : step,
+                                   self.g.jlo - bylo + jshift : self.g.jhi + byhi + jshift + 1 : step])
         elif c == 3:
-            return np.asarray(self[self.g.ilo - bxlo + ishift : self.g.ihi + bxhi + ishift + 1 : s,
-                                   self.g.jlo - bylo + jshift : self.g.jhi + byhi + jshift + 1 : s,
+            return np.asarray(self[int(self.g.ilo - bxlo + ishift) : int(self.g.ihi + bxhi + ishift) + 1 : step,
+                                   int(self.g.jlo - bylo + jshift) : int(self.g.jhi + byhi + jshift) + 1 : step,
                                    nc])
 
     def laplacian5(self, nc = 0, nbuf = 0):
@@ -309,9 +309,9 @@ class ExtendedArray(np.ndarray):
             if self.dtype == np.int:
                 fmt = "%4d"
             elif self.dtype == np.float64:
-                fmt = "8.5g%"
+                fmt = "%10.5g"
             else:
-                raise ValueError("ERROR: dtype not supported")
+                raise ValueError("dtype not supported")
 
         if show_ghost:
             ilo = 0
@@ -348,6 +348,7 @@ class ExtendedArray(np.ndarray):
                     print("\033[31m" + fmt % (val) + "\033[0m", end = "")
                 else:
                     print(fmt % (val), end = "")
+            print("")
 
         leg = """
          ^ y
