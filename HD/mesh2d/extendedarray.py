@@ -178,7 +178,7 @@ class ExtendedArray(np.ndarray):
 
         return self.symmetric(nodal = nodal, atol = atol, asym = True)
 
-    def fillghost(self, nc = 0, bc = None):
+    def fillghost(self, bc = None):
         """
         Using a boundary condition object, fill in the ghost cells
         to satisfy these boundary conditions.
@@ -191,108 +191,112 @@ class ExtendedArray(np.ndarray):
         outflow and reflect-odd boundaries.
         """
 
-        ## Lower x-boundary
-        if bc.xlb in ["outflow", "neumann"]:
-            if bc.xl_value is None:
+        nc = self.shape[-1]
+
+        for n in np.arange(0, nc):
+
+            ## Lower x-boundary
+            if bc.xlb in ["outflow", "neumann"]:
+                if bc.xl_value is None:
+                    for i in range(self.g.ilo):
+                        self[i, :, n] = self[self.g.ilo, :, n]
+                else:
+                    self[self.g.ilo - 1, :, n] = (self[self.g.ilo, :, n] -
+                                                  self.g.dx * bc.xl_value[:])
+
+            elif bc.xlb == "reflect-even":
                 for i in range(self.g.ilo):
-                    self[i, :, nc] = self[self.g.ilo, :, nc]
-            else:
-                self[self.g.ilo - 1, :, nc] = (self[self.g.ilo, :, nc] -
-                                               self.g.dx * bc.xl_value[:])
+                    self[i, :, n] = self[2 * self.g.ng - i - 1, :, n]
 
-        elif bc.xlb == "reflect-even":
-            for i in range(self.g.ilo):
-                self[i, :, nc] = self[2 * self.g.ng - i - 1, :, nc]
+            elif bc.xlb in ["reflect-odd", "dirichlet"]:
+                if bc.xl_value is None:
+                    for i in range(self.g.ilo):
+                        self[i, :, n] = - self[2 * self.g.ng - i - 1, :, n]
+                else:
+                    self[self.g.ilo - 1, :, n] = (2 * bc.xl_value[:] -
+                                                  self[self.g.ilo, :, n])
 
-        elif bc.xlb in ["reflect-odd", "dirichlet"]:
-            if bc.xl_value is None:
+            elif bc.xlb == "periodic":
                 for i in range(self.g.ilo):
-                    self[i, :, nc] = - self[2 * self.g.ng - i - 1, :, nc]
-            else:
-                self[self.g.ilo - 1, :, nc] = (2 * bc.xl_value[:] -
-                                               self[self.g.ilo, :, nc])
-
-        elif bc.xlb == "periodic":
-            for i in range(self.g.ilo):
-                self[i, :, nc] = self[self.g.ihi - self.g.ng + i + 1, :, nc]
+                    self[i, :, n] = self[self.g.ihi - self.g.ng + i + 1, :, n]
 
 
-        ## Upper x-boundary
-        if bc.xrb in ["outflow", "neumann"]:
-            if bc.xr_value is None:
-                for i in range(self.g.ihi + 1, self.g.nx + 2 * self.g.ng):
-                    self[i, :, nc] = self[self.g.ihi, :, nc]
-            else:
-                self[self.g.ihi + 1, :, nc] = (self[self.g.ihi, :, nc] -
-                                               self.g.dx * bc.xr_value)
+            ## Upper x-boundary
+            if bc.xrb in ["outflow", "neumann"]:
+                if bc.xr_value is None:
+                    for i in range(self.g.ihi + 1, self.g.nx + 2 * self.g.ng):
+                        self[i, :, n] = self[self.g.ihi, :, n]
+                else:
+                    self[self.g.ihi + 1, :, n] = (self[self.g.ihi, :, n] -
+                                                  self.g.dx * bc.xr_value)
 
-        elif bc.xrb == "reflect-even":
-            for i in range(self.g.ng):
-                self[self.g.ihi + i + 1, :, nc] = self[self.g.ihi - i, :, nc]
-
-        elif bc.xrb in ["reflect-odd", 'dirichlet']:
-            if bc.xr_value is None:
+            elif bc.xrb == "reflect-even":
                 for i in range(self.g.ng):
-                    self[self.g.ihi + i + 1, :, nc] = - self[self.g.ihi - i, :, nc]
+                    self[self.g.ihi + i + 1, :, n] = self[self.g.ihi - i, :, n]
 
-            else:
-                self[self.g.ihi + 1, :, nc] = (2 * bc.xr_value[:] -
-                                               self[self.g.ihi, :, nc])
+            elif bc.xrb in ["reflect-odd", 'dirichlet']:
+                if bc.xr_value is None:
+                    for i in range(self.g.ng):
+                        self[self.g.ihi + i + 1, :, n] = - self[self.g.ihi - i, :, n]
 
-        elif bc.xrb == "periodic":
-            for i in range(self.g.ihi + 1, self.g.nx + 2 * self.g.ng):
-                self[i, :, nc] = self[i - self.g.ihi - 1 + self.g.ng, :, nc]
+                else:
+                    self[self.g.ihi + 1, :, n] = (2 * bc.xr_value[:] -
+                                                  self[self.g.ihi, :, n])
 
-        ## Lower y-boundary
-        if bc.ylb in ["outflow", "neumann"]:
-            if bc.yl_value is None:
+            elif bc.xrb == "periodic":
+                for i in range(self.g.ihi + 1, self.g.nx + 2 * self.g.ng):
+                    self[i, :, n] = self[i - self.g.ihi - 1 + self.g.ng, :, n]
+
+            ## Lower y-boundary
+            if bc.ylb in ["outflow", "neumann"]:
+                if bc.yl_value is None:
+                    for j in range(self.g.jlo):
+                        self[:, j, n] = self[:, self.g.jlo, n]
+                else:
+                    self[:, self.g.jlo, n] = (self[:, self.g.jlo, n] -
+                                              self.g.dy * bc.yl_value[:])
+
+            elif bc.ylb == "reflect-even":
                 for j in range(self.g.jlo):
-                    self[:, j, nc] = self[:, self.g.jlo, nc]
-            else:
-                self[:, self.g.jlo, nc] = (self[:, self.g.jlo, nc] -
-                                           self.g.dy * bc.yl_value[:])
+                    self[:, j, n] = self[:, 2 * self.g.ng - j -1, n]
 
-        elif bc.ylb == "reflect-even":
-            for j in range(self.g.jlo):
-                self[:, j, nc] = self[:, 2 * self.g.ng - j -1, nc]
+            elif bc.ylb in ["reflect-odd", "dirichlet"]:
+                if bc.yl_value is None:
+                    for j in range(self.g.jlo):
+                        self[:, j, n] = self[:, 2 * self.g.ng - j -1, n]
+                else:
+                    self[:, self.g.jlo - 1, n] = (2 * bc.yl_value[:] -
+                                                  self[:, self.g.jlo, n])
 
-        elif bc.ylb in ["reflect-odd", "dirichlet"]:
-            if bc.yl_value is None:
+            elif bc.ylb == "periodic":
                 for j in range(self.g.jlo):
-                    self[:, j, nc] = self[:, 2 * self.g.ng - j -1, nc]
-            else:
-                self[:, self.g.jlo - 1, nc] = (2 * bc.yl_value[:] -
-                                               self[:, self.g.jlo, nc])
+                    self[:, j, n] = self[:, self.g.jhi - self.g.ng + j + 1, n]
 
-        elif bc.ylb == "periodic":
-            for j in range(self.g.jlo):
-                self[:, j, nc] = self[:, self.g.jhi - self.g.ng + j + 1, nc]
+            ## Upper y-boundary
+            if bc.yrb in ["outflow", "neumann"]:
+                if bc.yr_value is None:
+                    for j in range(self.g.jhi + 1, self.g.ny + 2 * self.g.ng):
+                        self[:, j, n] = self[:, self.g.jhi, n]
+                else:
+                    self[:, self.g.jhi + 1, n] = (self[:, self.g.jhi, n] +
+                                                  self.g.dy * bc.yr_value[:])
 
-        ## Upper y-boundary
-        if bc.yrb in ["outflow", "neumann"]:
-            if bc.yr_value is None:
-                for j in range(self.g.jhi + 1, self.g.ny + 2 * self.g.ng):
-                    self[:, j, nc] = self[:, self.g.jhi, nc]
-            else:
-                self[:, self.g.jhi + 1, nc] = (self[:, self.g.jhi, nc] +
-                                               self.g.dy * bc.yr_value[:])
-
-        elif bc.yrb == "reflect-even":
-            for j in range(self.g.ng):
-                self[:, self.g.jhi + j + 1, nc] = self[:, self.g.jhi - j, nc]
-
-        elif bc.yrb in ["reflect-odd", "dirichlet"]:
-            if bc.yr_value is None:
+            elif bc.yrb == "reflect-even":
                 for j in range(self.g.ng):
-                    self[:, self.g.jhi + j +1, nc] = - self[:, self,g.jhi - j, nc]
+                    self[:, self.g.jhi + j + 1, n] = self[:, self.g.jhi - j, n]
 
-            else:
-                self[:, self.g.jhi + 1, nc] = (2 * bc.yr_value[:] -
-                                               self[:, self.g.jhi, nc])
+            elif bc.yrb in ["reflect-odd", "dirichlet"]:
+                if bc.yr_value is None:
+                    for j in range(self.g.ng):
+                        self[:, self.g.jhi + j +1, n] = - self[:, self,g.jhi - j, n]
 
-        elif bc.yrb == "periodic":
-            for j in range(self.g.jhi + 1, self.g.ny + 2 * self.g.ng):
-                self[:, j, nc] = self[:, j - self.g.jhi - 1 + self.g.ng, nc]
+                else:
+                    self[:, self.g.jhi + 1, n] = (2 * bc.yr_value[:] -
+                                                  self[:, self.g.jhi, n])
+
+            elif bc.yrb == "periodic":
+                for j in range(self.g.jhi + 1, self.g.ny + 2 * self.g.ng):
+                    self[:, j, n] = self[:, j - self.g.jhi - 1 + self.g.ng, n]
 
 
     def pprint(self, nc = 0, fmt = None, show_ghost = True):

@@ -62,8 +62,7 @@ def boundary_is_solid(bc):
 
 class BC(object):
     """
-    Boundary condition container -- holds the boundary conditions on each boundary
-    for a single variable.
+    Boundary condition container -- holds the boundary conditions on each boundary.
 
     For Neumann and Dirichlet boundaries, a function callback can be stored for
     inhomogeneous conditions. The use of Neumann and Dirichlet boundaries require

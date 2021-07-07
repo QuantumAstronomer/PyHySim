@@ -4,7 +4,40 @@ for data living on a grid.
 
 Typical usage to initialize any data onto the grid may lool like:
 
+ -- Create a grid object:
 
+        grid = Grid2D(nx, ny, (nghost))
+
+ -- Create the data that lives on the grid and define boundary conditions:
+
+        data = CellCenterData2D(grid)
+
+        bc = BoundaryConditions(xlb = ..., xrb = ...
+                                ylb = ..., yrb = ...)
+
+        data.register_var("variable1")
+        data.register_var("variable2")
+        ....
+
+        data.create()
+
+ -- Register the boundary conditions you defined:
+
+    data.register_bcs(bc)
+
+ -- Initialize data onto the grid:
+
+        var1 = data.get_var("variable1")
+        var1[:, :] = ...
+        var2 = data.get_var("variable2")
+        var2[:, :] = ...
+        ...
+
+ -- Fill in the ghost cells:
+
+        data.fill_BC()
+
+Now you are ready to use your grid data
 """
 
 from __future__ import print_function
@@ -160,7 +193,33 @@ class CellCenterData2D(object):
     A CellCenterData2D object is built in a multi-step process
     before being completely functional. These steps are:
 
+     -- Create the CellCenterData2D object. Pass in a grid to
+        describe where the data lives:
 
+            myData = CellCenterData2D(myGrid)
+
+     -- Register any variables that are expected to live on the
+        grid, before registering the boundary conditions to use
+        for all these variables.
+
+            myData.register_var("density")
+            myData.register_var("x-momentum")
+            ...
+            myData.register_bcs(bc)
+
+     -- Register any auxiliary parameters, that might be needed
+        to interpret the data outside of a simulation (like gamma
+        needed in the equation of state for example).
+
+            myData.set_auxiliary(keyword, value)
+
+     -- Finish the initialization of the meshgrid:
+
+            myData.create()
+
+    This last step allocates the storage for the state variables.
+    Once this has been done, the meshgrid is locked and variables
+    can no longer be added.
     """
 
     def __init__(self, grid, dtype = np.float64):
@@ -186,12 +245,10 @@ class CellCenterData2D(object):
         self.auxiliary = {}
         self.derived = []
 
-        self.BCs = {}
         self.t = -1.
-
         self.initialized = 0
 
-    def register_var(self, name, bc):
+    def register_var(self, name):
         """
         Register a variable through the CellCenterData2D object.
 
@@ -200,9 +257,6 @@ class CellCenterData2D(object):
 
         name : string
               The name to use for the variable.
-        bc : BC object
-              The boundary conditions that describe the actions to take for
-              this variable at the physical domain boundaries.
         """
 
         if self.initialized == 1:
@@ -210,7 +264,26 @@ class CellCenterData2D(object):
 
         self.varnames.append(name)
         self.nvars += 1
-        self.BCs[name] = bc
+
+    def register_bcs(self, bc):
+        """
+        Register the boundary conditions to be used on each variable.
+        NOTE: Only a SINGLE boundary condition should be supplied as this
+        is applied to all variables, i.e. different variables can not have
+        different boundary conditions.
+
+            Parameters:
+        -------------------
+
+        bc : BC object
+              The boundary conditions that describe the actions to take for
+              this variable at the physical domain boundaries.
+        """
+
+        if self.initialized == 1:
+            raise TypeError("grid is already initialized")
+
+        self.BCs = bc
 
     def set_auxiliary(self, keyword, value):
         """
@@ -283,9 +356,9 @@ class CellCenterData2D(object):
         for n in range(self.nvars):
             output_string += "{:16s} min = {:15.10f},    max = {:15.10f}\n".format(
                               self.varnames[n], self.min(self.varnames[n]), self.max(self.varnames[n]))
-            output_string += "{:16s} BCs: -x = {:12s}, +x = {:12s}, -y = {:12s}, +y = {:12s}".format(
-                              "", self.BCs[self.varnames[n]].xlb, self.BCs[self.varnames[n]].xrb,
-                                  self.BCs[self.varnames[n]].ylb, self.BCs[self.varnames[n]].yrb)
+        output_string += "{:16s} BCs: -x = {:12s}, +x = {:12s}, -y = {:12s}, +y = {:12s}".format(
+                          "", self.BCs.xlb, self.BCs.xrb,
+                              self.BCs.ylb, self.BCs.yrb)
 
         return output_string
 
@@ -399,61 +472,44 @@ class CellCenterData2D(object):
         n = self.varnames.index(name)
         self.data[:, :, n] = 0
 
-    def fill_all_BC(self):
+    def fill_BC(self):
         """
-        Fill in the boundary conditions for all variables
-        """
-
-        for name in self.names:
-            self.fill_BC(name)
-
-    def fill_BC(self, name):
-        """
-        Fill in the boundary conditions for a single state variable at once
-        associated with name, allows for higher flexibility.
-        Each varialbe name has its own boundary conditions stored in the
-        CellCenterData2D object.
-
-            Parameters:
-        -------------------
-
-        name : string
-              Name of the variable for which to fill in the boundary conditions.
+        Fill in the boundary conditions for the state variables
         """
 
         ## Handle all pre-defined boundary conditions in this way.
-        n = self.varnames.index(name)
-        self.data.fillghost(nc = n, bc = self.BCs[name])
+        ## n = self.varnames.index(name)
+        self.data.fillghost(bc = self.BCs)
 
         ## If a user-defined (custom) boundary condition must be used
         ## this will be handled explicitly here.
-        if self.BCs[name].xlb in bcs.extra_boundaries.keys():
+        if self.BCs.xlb in bcs.extra_boundaries.keys():
             try:
-                bcs.extra_boundaries[self.BCs[name].xlb](self.BCs[name].xlb,
+                bcs.extra_boundaries[self.BCs.xlb](self.BCs.xlb,
                                                         "xlb", name, self, self.ivars)
             except TypeError:
-                bcs.extra_boundaries[self.BCs[name].xlb](self.BCs[name].xlb,
+                bcs.extra_boundaries[self.BCs.xlb](self.BCs.xlb,
                                                         "xlb", name, self)
-        if self.BCs[name].xrb in bcs.extra_boundaries.keys():
+        if self.BCs.xrb in bcs.extra_boundaries.keys():
             try:
-                bcs.extra_boundaries[self.BCs[name].xrb](self.BCs[name].xrb,
+                bcs.extra_boundaries[self.BCs.xrb](self.BCs.xrb,
                                                         "xrb", name, self, self.ivars)
             except TypeError:
-                bcs.extra_boundaries[self.BCs[name].xrb](self.BCs[name].xrb,
+                bcs.extra_boundaries[self.BCs.xrb](self.BCs.xrb,
                                                         "xrb", name, self)
-        if self.BCs[name].ylb in bcs.extra_boundaries.keys():
+        if self.BCs.ylb in bcs.extra_boundaries.keys():
             try:
-                bcs.extra_boundaries[self.BCs[name].ylb](self.BCs[name].ylb,
+                bcs.extra_boundaries[self.BCs.ylb](self.BCs.ylb,
                                                         "ylb", name, self, self.ivars)
             except TypeError:
-                bcs.extra_boundaries[self.BCs[name].ylb](self.BCs[name].ylb,
+                bcs.extra_boundaries[self.BCs.ylb](self.BCs.ylb,
                                                         "ylb", name, self)
-        if self.BCs[name].yrb in bcs.extra_boundaries.keys():
+        if self.BCs.yrb in bcs.extra_boundaries.keys():
             try:
-                bcs.extra_boundaries[self.BCs[name].yrb](self.BCs[name].yrb,
+                bcs.extra_boundaries[self.BCs.yrb](self.BCs.yrb,
                                                         "yrb", name, self, self.ivars)
             except TypeError:
-                bcs.extra_boundaries[self.BCs[name].yrb](self.BCs[name].yrb,
+                bcs.extra_boundaries[self.BCs.yrb](self.BCs.yrb,
                                                         "yrb", name, self)
     def min(self, name, ng = 0):
         """
