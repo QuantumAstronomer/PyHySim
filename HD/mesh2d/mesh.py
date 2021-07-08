@@ -367,15 +367,15 @@ class CellCenterData2D(object):
 
         output_string =  "Cell centered data: \n {} x-zones, {} y-zones, {} ghostcells \n".format(
                           self.grid.nx, self.grid.ny, self.grid.ng)
-        output_string += "                   Number of variables = {}\n".format(self.nvars)
-        output_string += "                   Variable names:\n"
+        output_string += "  Number of variables = {}\n".format(self.nvars)
+        output_string += "  Variable names:\n"
 
         for n in range(self.nvars):
-            output_string += "{:16s} min = {:15.10f},    max = {:15.10f}\n".format(
+            output_string += "      {:16s} min = {:15.10f},    max = {:15.10f}\n".format(
                               self.varnames[n], self.min(self.varnames[n]), self.max(self.varnames[n]))
-        output_string += "{:16s} BCs: -x = {:12s}, +x = {:12s}, -y = {:12s}, +y = {:12s}".format(
-                          "", self.BCs.xlb, self.BCs.xrb,
-                              self.BCs.ylb, self.BCs.yrb)
+        output_string += "BCs: -x = {:12s}, +x = {:12s}, -y = {:12s}, +y = {:12s}".format(
+                          self.BCs.xlb, self.BCs.xrb,
+                          self.BCs.ylb, self.BCs.yrb)
 
         return output_string
 
@@ -575,7 +575,7 @@ class CellCenterData2D(object):
                                           fdata.ijshift(1, 2, step = 4) + fdata.ijshift(1, 3, step = 4) +
                                           fdata.ijshift(2, 1, step = 4) + fdata.ijshift(3, 1, step = 4) +
                                           fdata.ijshift(2, 2, step = 4) + fdata.ijshift(3, 2, step = 4) +
-                                          fdata.ijshift(2, 3, step = 4) + fdata.ijshfit(3, 3, step = 4))
+                                          fdata.ijshift(2, 3, step = 4) + fdata.ijshift(3, 3, step = 4))
         else:
             raise ValueError("Restriction is only allowed by a factor 2 or 4")
 

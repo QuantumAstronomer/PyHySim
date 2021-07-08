@@ -2,7 +2,7 @@
 This file contains methods that aid in managing boundary conditions of the grid
 """
 
-from __future__ import print_functionF
+from __future__ import print_function
 from utilities import message as msg
 
 ## Defining a dictionary to keep track whether or not a boundary condition is solid or not.
@@ -211,8 +211,8 @@ class BC(object):
             Print out some basic information about the boundary condition object
             """
 
-            string = """Boundary conditions:
-                        -x %s   +x %s
-                        -y %s   +y %s
-                        """ % (self.xlb, self.xrb, self.ylb, self.yrb)
-            return string
+            output_string  = "Boundary Conditions: \n"
+            output_string += "      -x = {:16s}    +x = {:16s} \n".format(self.xlb, self.xrb)
+            output_string += "      -y = {:16s}    +y = {:16s} \n".format(self.ylb, self.yrb)
+
+            return output_string
