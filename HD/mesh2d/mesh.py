@@ -23,7 +23,7 @@ Typical usage to initialize any data onto the grid may lool like:
 
  -- Register the boundary conditions you defined:
 
-    data.register_bcs(bc)
+        data.register_bcs(bc)
 
  -- Initialize data onto the grid:
 
@@ -44,8 +44,9 @@ from __future__ import print_function
 import numpy as np
 import h5py
 
-import boundaryconditions as bcs
-import extendedarray as ea
+import mesh2d.boundaryconditions as bcs
+import mesh2d.extendedarray as ea
+from utilities import message as msg
 
 class Grid2D(object):
     """
@@ -136,17 +137,17 @@ class Grid2D(object):
         ## 2D versions of the zone-coordinates
         self.y2d, self.x2d = np.meshgrid(self.yc, self.xc)
 
-    def scratch_array(self, nvar = 1):
+    def scratch_array(self, nvars = 1):
         """
         Return a standard numpy array with the dimensions to match the
         size and number of ghostcells as the parent grid.
         """
 
-        if nvar == 1:
+        if nvars == 1:
             return ea.ExtendedArray(data = np.zeros(shape = (self.qx, self.qy),
                                                     dtype = np.float64), grid = self)
-        elif nvar > 1:
-            return ea.ExtendedArray(data = np.zeros(shape = (self.qx, self.qy, nvar),
+        elif nvars > 1:
+            return ea.ExtendedArray(data = np.zeros(shape = (self.qx, self.qy, nvars),
                                                     dtype = np.float64), grid = self)
 
     def coarse_like(self, N):
@@ -260,7 +261,7 @@ class CellCenterData2D(object):
         """
 
         if self.initialized == 1:
-            raise TypeError("grid already initialized")
+            msg.fail("ERROR: grid already initialized")
 
         self.varnames.append(name)
         self.nvars += 1
@@ -281,7 +282,7 @@ class CellCenterData2D(object):
         """
 
         if self.initialized == 1:
-            raise TypeError("grid is already initialized")
+            msg.fail("ERROR: grid is already initialized")
 
         self.BCs = bc
 
@@ -333,12 +334,28 @@ class CellCenterData2D(object):
         """
 
         if self.initialized == 1:
-            TypeError("Grid has already been initialized")
+            msg.fail("ERROR: grid has already been initialized")
 
         self.data = ea.ExtendedArray(data = np.zeros(shape = (self.grid.qx, self.grid.qy, self.nvars),
                                                      dtype = self.dtype),
                                      grid = self.grid)
         self.initialized = 1
+
+    def clone(self):
+        """
+        Create a new CellCenterData2D object that is an exact copy
+        of the current one.
+        """
+
+        new = CellCenterData2D(self.grid, dtype = self.dtype)
+
+        for n in range(self.nvars):
+            new.register_var(self.varnames[n])
+
+        new.register_bcs(self.BCs)
+        new.aux     = self.aux.copy()
+        new.data    = self.data.copy()
+        new.derived = self.derived.copy()
 
     def __str__(self):
         """
@@ -511,6 +528,7 @@ class CellCenterData2D(object):
             except TypeError:
                 bcs.extra_boundaries[self.BCs.yrb](self.BCs.yrb,
                                                         "yrb", name, self)
+
     def min(self, name, ng = 0):
         """
         Return the minimum of the variable name in the domains valid region.
