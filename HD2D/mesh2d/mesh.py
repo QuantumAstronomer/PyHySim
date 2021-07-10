@@ -676,7 +676,7 @@ class CellCenterData2D(object):
             fvar.attrs["ylb"] = self.BCs[self.varnames[n]].ylb
             fvar.attrs["yrb"] = self.BCs[self.varnames[n]].yrb
 
-    def pprint(self, var, ivars, fmt = None):
+    def pprint(self, var, fmt = None):
         """
         Print out the contents of the data array with pretty formatting
         making clear which cells are actual data and which are ghost cells.
