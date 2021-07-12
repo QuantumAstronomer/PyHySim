@@ -4,8 +4,6 @@ reconstruction of slopes process to find the interface states.
 """
 
 import numpy as np
-from dotmap import DotMap as DM
-from numba import njit
 
 def flatten1d(grid, Q, direction, ivars, rp):
     """
