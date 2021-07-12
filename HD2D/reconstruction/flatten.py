@@ -33,10 +33,10 @@ def flatten1d(grid, Q, direction, ivars, rp):
     t1 = grid.scratch_array()
     t2 = grid.scratch_array()
 
-    delta = rp.get_params("flattening.delta")
-    z1  = rp.get_params("flattening.z1")
-    z2  = rp.get_params("flattening.z2")
-    tol = rp.get_params("flattening.tolerance")
+    delta = rp.get_params("reconstruction.delta")
+    z1  = rp.get_params("reconstruction.z1")
+    z2  = rp.get_params("reconstruction.z2")
+    tol = rp.get_params("reconstruction.tolerance")
 
     if direction == "x":
 
