@@ -36,7 +36,6 @@ def limit(data, grid, direction, kind = "MCorder4"):
 
     if kind == "None":
         ## This is a centered difference without limiting
-
         limited = grid.scratch_array()
         if direction == "x":
             limited.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
@@ -51,14 +50,18 @@ def limit(data, grid, direction, kind = "MCorder4"):
         return MCorder4(data, grid, direction)
 
     elif kind == "minmod":
-        return minmod(data, grid, direction)
+        return minmodRoe(data, grid, direction)
 
     elif kind == "Superbee":
-        return minmod(data, grid, direction)
+        return superbee(data, grid, direction)
+
+    elif kind == "vanLeer":
+        return vanleer(data,grid, direction)
 
     else:
         msg.fail("ERROR: flux limiter not defined.")
 
+## These are some helper functions useful in the limiting procedure
 def minmod(x, y):
     if abs(x) < abs(y) and x * y > 0.0:
         return x
@@ -74,6 +77,10 @@ def maxmod(x, y):
         return y
     else:
         return 0.0
+
+##--------------------------------------------------------------##
+## First we define all the non CFL-dependent limiting functions ##
+##--------------------------------------------------------------##
 
 def MCorder2(data, grid, direction):
     """
@@ -137,29 +144,65 @@ def MCorder4(data, grid, direction):
 
     return limited
 
-def minmod(data, grid, direction):
+def minmodRoe(data, grid, direction):
     """
-    Roe's original 1986 minmod limiter.
+    Roe's minmod limiter.
     """
 
     limited = grid.scratch_array()
 
-    dl + grid.scratch_array()
+    dc = grid.scratch_array()
+    dl = grid.scratch_array()
     dr = grid.scratch_array()
 
     if direction == "x":
 
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
         dr.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
         dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
 
     elif direction == "y":
 
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.jshift(1, nbuf = 2) - data.jshift(-1, nbuf = 2))
         dr.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
         dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
 
-    limited.valid(nbuf = grid.ng)[:, :] = minmod(dl, dr)
+    ratio = dr / dl
+    phi = np.maximum(0, np.mimimum(1, ratio))
+    limited.valid(nbuf = grid.ng)[:, :] = dc * phi
 
     return limited
+
+def doubleminmod(data, grid, direction):
+    """
+    The double minmod limiter.
+    """
+
+    limited = grid.scratch_array()
+
+    dc = grid.scratch_array()
+    dl = grid.scratch_array()
+    dr = grid.scratch_array()
+
+    if direction == "x":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
+
+    elif direction == "y":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.jshift(1, nbuf = 2) - data.jshift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
+
+    ratio = dr / dl
+    tmp_max = np.maximum((4 * ratio / (1 + r)), 4 / (1 + r))
+    phi = maxmod(0, tmp_max)
+    limited.valid(nbuf = grid.ng)[:, :] = dc * phi
+
+    return limited
+
 
 def superbee(data, grid, direction):
     """
@@ -168,17 +211,115 @@ def superbee(data, grid, direction):
 
     limited = grid.scratch_array()
 
-    dl + grid.scratch_array()
+    dc = grid.scratch_array()
+    dl = grid.scratch_array()
     dr = grid.scratch_array()
 
     if direction == "x":
 
-        dl.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
-        dr.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
 
     elif direction == "y":
 
-        dl.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
-        dr.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.jshift(1, nbuf = 2) - data.jshift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
 
-    limited = maxmod(minmod(dr, 2. * dr), minmod(dl, 2 * dr))
+    ratio = dr / dl
+    phi = maxmod(np.minimum(2 * r, 1), np.maximum(r, 2))
+    limited.valid(nbuf = grid.ng)[:, :] = dc * phi
+
+    return limited
+
+def vanleer(data, grid, direction):
+    """
+    The limiter following van Leer's perscription.
+    """
+
+    limited = grid.scratch_array()
+
+    dc = grid.scratch_array()
+    dl = grid.scratch_array()
+    dr = grid.scratch_array()
+
+    if direction == "x":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
+
+    elif direction == "y":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.jshift(1, nbuf = 2) - data.jshift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
+
+    ratio = dr / dl
+    phi = 2 * (ratio + abs(ratio)) / (1 + abs(ratio))**2
+    limited.valid(nbuf = grid.ng)[:, :] = dc * phi
+
+    return limited
+
+def vanalbada1(data, grid, direction):
+    """
+    van Albada's original 1982 limiter.
+    """
+
+    limited = grid.scratch_array()
+
+    dc = grid.scratch_array()
+    dl = grid.scratch_array()
+    dr = grid.scratch_array()
+
+    if direction == "x":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
+
+    elif direction == "y":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.jshift(1, nbuf = 2) - data.jshift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
+
+    ratio = dr / dl
+    phi = (ratio **2 + ratio) / (ratio**2 + 1)
+    limited.valid(nbuf = grid.ng)[:, :] = dc * phi
+
+    return limited
+
+def vanalbada2(data, grid, direction):
+    """
+    Alternative form of van Albada's limiter described by Kermani 2003.
+    """
+
+    limited = grid.scratch_array()
+
+    dc = grid.scratch_array()
+    dl = grid.scratch_array()
+    dr = grid.scratch_array()
+
+    if direction == "x":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.ishift(1, nbuf = 2) - data.ishift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.ishift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.ishift(-1, nbuf = 2)
+
+    elif direction == "y":
+
+        dc.valid(nbuf = 2)[:, :] = .5 * (data.jshift(1, nbuf = 2) - data.jshift(-1, nbuf = 2))
+        dr.valid(nbuf = 2)[:, :] = data.jshift(1, nbuf = 2) - data.valid(nbuf = 2)
+        dl.valid(nbuf = 2)[:, :] = data.valid(nbuf = 2) - data.jshift(-1, nbuf = 2)
+
+    ratio = dr / dl
+    phi = 2 * ratio / (ratio**2 + 1)
+    limited.valid(nbuf = grid.ng)[:, :] = dc * phi
+
+    return limited
+
+##------------------------------------------------------##
+## Next define all the CFL-dependent limiting functions ##
+##------------------------------------------------------##
