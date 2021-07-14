@@ -49,7 +49,7 @@ def limit(data, grid, direction, kind = "MCorder4"):
     elif kind == "MCorder4":
         return MCorder4(data, grid, direction)
 
-    elif kind == "minmod":
+    elif kind == "Minmod":
         return minmodRoe(data, grid, direction)
 
     elif kind == "Doubleminmod":
