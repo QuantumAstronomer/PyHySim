@@ -52,6 +52,9 @@ def limit(data, grid, direction, kind = "MCorder4"):
     elif kind == "minmod":
         return minmodRoe(data, grid, direction)
 
+    elif kind == "Doubleminmod":
+        return doubleminmod(data, grid, direction)
+
     elif kind == "Superbee":
         return superbee(data, grid, direction)
 
