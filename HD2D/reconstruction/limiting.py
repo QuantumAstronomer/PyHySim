@@ -47,10 +47,10 @@ def limit(data, grid, direction, kind = "MCorder4", differencing = "Centered"):
         return limited
 
     elif kind == "MCorder2":
-        return MCorder2(data, grid, direction)
+        return mcorder2(data, grid, direction)
 
     elif kind == "MCorder4":
-        return MCorder4(data, grid, direction)
+        return mcorder4(data, grid, direction)
 
     if kind not in ["MCorder2", "MCorder4"]:
 
