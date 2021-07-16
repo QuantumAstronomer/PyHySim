@@ -31,7 +31,7 @@ def limit(data, grid, direction, kind = "MCorder4", differencing = "Centered"):
           String indicating the type of slope limiter to use. Default is
           "MCorder4" the fourth order monotonized central difference limiter.
           This allows for easy switching between different limiter functions.
-    differencing : string, optional, default = "CD", ("CD", "FD", BD)
+    differencing : string, optional, default = "Centered",
           Differencing method to use when calculating the (limited) slope,
           Centered stands for centered difference, Forward is the forward
           difference, and Bacward is a backward differencing method.
