@@ -86,7 +86,7 @@ def limit(data, grid, direction, kind = "MCorder4", differencing = "Centered"):
         elif kind == "vanAlbada2":
             phi = vanalbada2(ratio)
         else:
-            msg.fail("ERROR: limiter not defined.")
+            raise NameError("Limiter is not defined.")
 
         if differencing == "Centered":
             limited.valid(nbuf = grid.ng)[:, :] = .5 * phi * dc
@@ -158,7 +158,7 @@ def CFLlimit(data, grid, direction, CFL, kind = "CFLSuperbee", differencing = "C
     elif kind == "Hyperpower":
         phi =  hyperpower(ratio, CFL)
     else:
-        msg.fail("ERROR: flux limiter not defined.")
+        raise NameError("Limiter is not defined.")
 
     if differencing == "Centered":
         limited.valid(nbuf = grid.ng)[:, :] = .5 * phi * dc
