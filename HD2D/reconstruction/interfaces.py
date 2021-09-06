@@ -16,7 +16,7 @@ def PCM(grid, U, direction):
     Project the cell-centered state onto the cell edge in
     one dimension using the first order piecewise constant
     method, i.e. ql_i-1/2 = q_i-1 and qr_i-1/2 = q_i.
-    The convention is followed that ql[i] = ql_i-1/2 and
+    The convention is followed that ql[i] = ql_i+1/2 and
     qr[i] = qr_i-1/2, as in the following scheme:
 
             |             |             |             |
@@ -24,7 +24,7 @@ def PCM(grid, U, direction):
            -+------+------+------+------+------+------+--
             |     i-1     |      i      |     i+1     |
                          ^ ^           ^
-                     q_l,i q_r,i  q_l,i+1
+                 qL[i - 1] qR[i]    qL[i]
 
         Parameters:
     -------------------
@@ -55,7 +55,7 @@ def PCM(grid, U, direction):
     jlo, jhi = grid.jlo, grid.jhi
 
     if direction == "x":
-        UL[ilo - 2,: ihi + 2, :] = U[ilo - 3 : ihi + 1, :]
+        UL[ilo - 2,: ihi + 2, :] = U[ilo - 2 : ihi + 2, :]
         UR[ilo - 2 : ihi + 2, :] = U[ilo - 2 : ihi + 2, :]
     elif direction == "y":
         UL[:, jlo - 2 : jhi + 2] = U[:, jlo - 3 : jhi + 1]
@@ -73,7 +73,7 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
     data is approximated by a line with non-zero slope within
     each computational zone. Also known as characteristic
     tracing method.
-    The convention is followed that Wl[i] = W_i-1/2,L and
+    The convention is followed that WL[i] = W_i+1/2,L and
     Wr[i] = W_i-1/2, R, as in the following scheme:
 
             |             |             |             |
@@ -81,7 +81,7 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
            -+------+------+------+------+------+------+--
             |     i-1     |      i      |     i+1     |
                          ^ ^           ^
-                     Wl[i] Wr[i]  Wl[i+1]
+                 WL[i - 1] WR[i]   WL[i]
 
     This means that using the data in cell W[i] we can find
     the states W_i+1/2,L and W_i-1/2,R.
@@ -198,7 +198,7 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
         Rvect[:, :, 3, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), cs[:, :] / W[:, :, ivars.d],
                                            np.zeros(shape = (qx, qy)), cs[:, :] * cs[:, :]], 0, -1)
 
-        ## For the additional scalar fields
+        ## For the additional scalar fields.
         Eigen[:, :, ns:] = W_ij[ivars.vx]
         for n in prange(ns, ns + nadv):
             Lvect[:, :, n, n] = 1.
@@ -226,7 +226,7 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
         Rvect[:, :, 3, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
                                            cs[:, :] / W[:, :, ivars.d], cs[:, :] * cs[:, :]], 0, -1)
 
-        ## For the additional scalar fields
+        ## For the additional scalar fields.
         Eigen[:, :, ns:] = W[:, :, ivars.vy]
         for n in prange(ns, ns + nadv):
             Lvect[:, :, n, n] = 1.
@@ -242,6 +242,8 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
     CharL = .5 * spacing * (np.maximum(0, Eigen[:, :, 3])[:, :, np.newaxis] - Eigen) * Char
     CharR = .5 * spacing * (np.minimum(0, Eigen[:, :, 0])[:, :, np.newaxis] - Eigen) * Char
 
+    ## Deprojecting the characteristic variables back onto the
+    ## primitive variables.
     for i in prange(ilo - 2, ihi + 2):
         for j in prange(jlo - 2, jhi + 2):
             dWL = np.dot(CharL[i, j], Rvect[i, j])
@@ -249,7 +251,6 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
 
     WL = W + lambdaL[:, :, np.newaxis] * dW + dWL
     WR = W - lambdaR[:, :, np.newaxis] * dW + dWR
-
 
     return WL, WR
 
@@ -340,82 +341,153 @@ def PPMCW(grid, W, dWc, dWl, dWr, dt, ivars, nadv, gamma, direction):
     ilo, ihi = grid.ilo, grid.ihi
     jlo, jhi = grid.jlo, grid.jhi
 
-    Eigen = np.zeros(shape = (nvar))
-    Lvect = np.zeros(shape = (nvar, nvar))
-    Rvect = np.zeros(shape = (nvar, nvar))
+    Eigen = np.zeros(shape = (qx, qy, nvar))
+    CharL = np.zeros(shape = (qx, qy, nvar))
+    CharR = np.zeros(shape = (qx, qy, nvar))
+    Lvect = np.zeros(shape = (qx, qy, nvar, nvar))
+    Rvect = np.zeros(shape = (qx, qy, nvar, nvar))
 
-    dtdx = dt / grid.dx
-    dtdy = dt / grid.dy
+    ## These arrays will store the intermediate characteristic
+    ## variables used in the computation.
+    dAc, dAl, dAr, dAm = np.zeros(shape = (4, qx, qy, nvar))
+    dWm = np.zeros(shape = (qx, qy, nvar))
+
+    tmpWL, tmpWR = np.zeros(shape = (2, qx, qy, nvar))
 
     WL = np.zeros_like(W)
     WR = np.zeros_like(W)
-    Wm = np.zeros_like(W)
+    dWL = np.zeros_like(W)
+    dWR = np.zeros_like(W)
+    cs = np.sqrt(gamma * W[:, :, ivars.p] / W[:, :, ivars.d])
+
+    ## Construct the eigenvalues and eigenvectors.
+    if direction == "x":
+        spacing = dt / grid.dx
+        Eigen[:, :, :ns] = np.moveaxis([W[:, :, ivars.vx] - cs[:, :], W[:, :, ivars.vx],
+                                        W[:, :, ivars.vx], W[:, :, ivars.vx] + cs[:, :]], 0, -1)
+
+        Lvect[:, :, 0, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), -.5 * W[:, :, ivars.d] / cs[:, :],
+                                           np.zeros(shape = (qx, qy)), .5 / (cs[:, :] * cs[:, :])], 0, -1)
+        Lvect[:, :, 1, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           np.zeros(shape = (qx, qy)), -1. / (cs * cs)], 0, -1)
+        Lvect[:, :, 2, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy))], 0, -1)
+        Lvect[:, :, 3, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), .5 * W[:, :, ivars.d] / cs[:, :],
+                                           np.zeros(shape = (qx, qy)), .5 / (cs[:, :] * cs[:, :])], 0, -1)
+
+        Rvect[:, :, 0, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), - cs[:, :] / W[:, :, ivars.d],
+                                           np.zeros(shape = (qx, qy)), cs[:, :] * cs[:, :]], 0, -1)
+        Rvect[:, :, 1, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy))], 0, -1)
+        Rvect[:, :, 2, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy))], 0, -1)
+        Rvect[:, :, 3, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), cs[:, :] / W[:, :, ivars.d],
+                                           np.zeros(shape = (qx, qy)), cs[:, :] * cs[:, :]], 0, -1)
+
+        ## For the additional scalar fields
+        Eigen[:, :, ns:] = W_ij[ivars.vx]
+        for n in prange(ns, ns + nadv):
+            Lvect[:, :, n, n] = 1.
+            Rvect[:, :, n, n] = 1.
+
+    elif direction == "y":
+        spacing = dt / grid.dy
+        Eigen[:, :, :ns] = np.array([W[:, :, ivars.vy] - cs[:, :], W[:, :, ivars.vy], W[:, :, ivars.vy], W[:, :,ivars.vy] + cs[:, :]])
+
+        Lvect[:, :, 0, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           -.5 * W[:, :, ivars.d] / cs, .5 / (cs[:, :] * cs[:, :])], 0, -1)
+        Lvect[:, :, 1, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           np.zeros(shape = (qx, qy)), -1. / (cs[:, :] * cs[:, :])], 0, -1)
+        Lvect[:, :, 2, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), np.ones(shape = (qx, qy)),
+                                           np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy))], 0, -1)
+        Lvect[:, :, 3, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           .5 * W_ij[:, :, ivars.d] / cs[:, :], .5 / (cs[:, :] * cs[:, :])], 0, -1)
+
+        Rvect[:, :, 0, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           - cs[:, :] / W[:, :, ivars.d], cs[:, :] * cs[:, :]], 0, -1)
+        Rvect[:, :, 1, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy))], 0, -1)
+        Rvect[:, :, 2, :ns] = np.moveaxis([np.zeros(shape = (qx, qy)), np.ones(shape = (qx, qy)),
+                                           np.zeros(shape = (qx, qy)), np.zeros(shape = (qx, qy))], 0, -1)
+        Rvect[:, :, 3, :ns] = np.moveaxis([np.ones(shape = (qx, qy)), np.zeros(shape = (qx, qy)),
+                                           cs[:, :] / W[:, :, ivars.d], cs[:, :] * cs[:, :]], 0, -1)
+
+        ## For the additional scalar fields
+        Eigen[:, :, ns:] = W[:, :, ivars.vy]
+        for n in prange(ns, ns + nadv):
+            Lvect[:, :, n, n] = 1.
+            Rvect[:, :, n, n] = 1.
+
+    ## Projecting onto the characteristic variables.
+    for i in prange(ilo - 2, ihi + 2):
+        for j in prange(jlo - 2, jhi + 2):
+            dAc[i, j] = np.dot(Lvect[i, j], dWc[i, j])
+            dAl[i, j] = np.dot(Lvect[i, j], dWl[i, j])
+            dAr[i, j] = np.dot(Lvect[i, j], dWr[i, j])
+
+    ## Apply monotonicity constraint to ensure a TVD scheme.
+    dAm = np.sign(dAc) * np.minimum(np.fabs(dAc), np.minimum(2 * np.fabs(dAr), 2 * np.fabs(dAl)))
+
+    ## Deproject back to the primitve variables.
+    for i in prange(ilo - 2, ihi + 2):
+        for j in prange(jlo - 2, jhi + 2):
+            dWm[i, j] = np.dot(dAm[i, j], Rvect[i, j])
+
+    ## Computing the left and right-side values of each cell using
+    ## a parabolic interpolant.
+    if direction == "x":
+        tmpWL[ilo - 2: ihi + 2, :] = .5 * (W[ilo - 2: ihi + 2, :] + W[ilo - 3: ihi + 1, :]) - \
+                                     1/6 * (dWm[ilo - 2: ihi + 2, :] + dWm[ilo - 3: ihi + 1, :])
+        tmpWR[ilo - 2: ihi + 2, :] = .5 * (W[ilo - 2: ihi + 2, :] + W[ilo - 1: ihi + 3, :]) - \
+                                     1/6 * (dWm[ilo - 2: ihi + 2, :] + dWm[ilo - 1: ihi + 3, :])
+    elif direction == "y":
+        tmpWL[:, jlo - 2: jhi + 2] = .5 * (w[:, jlo - 2: jhi + 2] + W[:, jlo - 3, jhi + 1]) - \
+                                     1/6 * (dWm[:, jlo - 2: jhi + 2] + dWm[:, jlo - 3: jhi + 1])
+        tmpWR[:, jlo - 2: jhi + 2] = .5 * (W[:, jlo - 2: jhi + 2] + W[:, jlo - 1: jhi + 3]) - \
+                                     1/6 * (dWm[:, jlo - 2: jhi + 2] + dWm[:, jlo - 1: jhi + 3])
+
+    ## Next apply even further monotonicity constraints
+    ## as in Colella and Woodward equations 1.10
+    if (tmpWR - W) * (W - tmpWL) <= 0:
+        tmpWL, tmpWR = W, W
+    elif 6 * (tmpWR - tmpWL) * (W - .5 * (tmpWL + tmpWR)) > (tmpWR - tmpWL)**2:
+        tmpWL = 3 * W - 2 * tmpWR
+    elif 6 * (tmpWR - tmpWL) * (W - .5 * (tmpWL + tmpWR)) < - (tmpWR - tmpWL)**2:
+        tmpWR = 3 * W - 2 * tmpWL
+
+    ## Compute the coefficients for the parabolic interpoltation function
+    dWm = tmpWR - tmpWL
+    W6  = 6 * (W - .5 * (tmpWL + tmpWR))
+
+    lmax = np.maximum(Eigen[:, :, 3], 0)
+    lmin = np.minimum(Eigen[:, :, 0], 0)
+
+    ## Calculating the interface values
+    WhatL = tmpWR - .5 * lmax[:, :, np.newaxis] * spacing * (dWm - (1 - 2 / 3 * lmax * spacing) * W6)
+    WhatR = tmpWL + .5 * lmin[:, :, np.newaxis] * spacing * (dWm + (1 - 2 / 3 * lmin * spacing) * W6)
+
+    ## Performing the characteristic tracing step by getting rid off waves
+    ## that do not reach the interface in time dt/2
+    A =  .5 * spacing * (Eigen[:, :, 3] - Eigen[:, :, :])
+    B = 1/3 * spacing * (Eigen[:, :, 3] * Eigen[:, :, 3] - Eigen[:, :, :] * Eigen[:, :, :])
+    C =  .5 * spacing * (Eigen[:, :, 0] - Eigen[:, :, :])
+    D = 1/3 * spacing * (Eigen[:, :, 0] * Eigen[:, :, 0] - Eigen[:, :, :] * Eigen[:, :, :])
+
+    Left  = A * (dWm - W6) + B * W6
+    Right = C * (dWm + W6) + D * W6
 
     for i in prange(ilo - 2, ihi + 2):
         for j in prange(jlo - 2, jhi + 2):
+            CharL[i, j] = np.dot(Lvect[i, j], Left[i, j])
+            CharR[i, j] = np.dot(Lvect[i, j], Right[i, j])
 
-            W_ij  = W[i, j, :]
-            dWc_ij = dWc[i, j, :]
-            dWl_ij = dWl[i, j, :]
-            dWr_ij = dWr[i, j, :]
+    for i in prange(ilo - 2, ihi + 2):
+        for j in prange(jlo - 2, jhi + 2):
+            dWL[i, j] = np.dot(CharL[i, j], Rvect[i, j])
+            dWR[i, j] = np.dot(CharR[i, j], Rvect[i, j])
 
-            cs = np.sqrt(gamma * W_ij[ivars.p] / W_ij[ivars.d])
 
-            Eigen[:] = 0.
-            Lvect[:, :] = 0.
-            Rvect[:, :] = 0.
+    WL = WhatL + dWL
+    WR = WhatR + dWR
 
-            ## Construct the eigenvalues and eigenvectors
-            if direction == "x":
-                Eigen[:ns] = np.array([W_ij[ivars.vx] - cs, W_ij[ivars.vx], W_ij[ivars.vx], W_ij[ivars.vx] + cs])
-
-                Lvect[0, :ns] = [0., -.5 * W_ij[ivars.d] / cs, 0, .5 / (cs * cs)]
-                Lvect[1, :ns] = [1., 0., 0., -1. / (cs * cs)]
-                Lvect[2, :ns] = [0., 0., 1., 0.]
-                Lvect[3, :ns] = [0., .5 * W_ij[ivars.d] / cs, 0., .5 / (cs * cs)]
-
-                Rvect[0, :ns] = [1, - cs / W_ij[ivars.d], 0, cs * cs]
-                Rvect[1, :ns] = [1., 0., 0., 0.,]
-                Rvect[2, :ns] = [0., 0., 1., 0.]
-                Rvect[3, :ns] = [1, cs / W_ij[ivars.d], 0, cs * cs]
-
-                ## For the additional scalar fields
-                Eigen[ns:] = W_ij[ivars.vx]
-                for n in prange(ns, ns + nadv):
-                    Lvect[n, n] = 1.
-                    Rvect[n, n] = 1.
-
-                ## Project the primitive variables onto the characteristic variables
-                dAc = np.dot(Lvect, dWc_ij)
-                dAr = np.dot(Lvect, dWr_ij)
-                dAl = np.dot(Lvect, dWl_ij)
-
-                ## Apply the monotonicity contraint to ensure the reconsruction
-                ## is total variation deminishing (TVD).
-                dAm = np.minimum(2 * np.fabs(dAr), 2 * np.fabs(dAl))
-                dA = np.sign(dAc) * np.minimum(dAm, dAc)
-
-                ## Deproject the characteristic variables back onto
-                ## the primitive variables.
-                Wm[i, j, :] = np.dot(da, Rvect)
-
-                WL_ij = .5 * (W_ij + W[i + 1, j, :]) - 1/6 * (Wm[i, j, :])
-
-            elif direction == "y":
-                Eigen[:ns] = np.array([W_ij[ivars.vy] - cs, W_ij[ivars.vy], W_ij[ivars.vy], W_ij[ivars.vy] + cs])
-
-                Lvect[0, :ns] = [0., -.5 * W_ij[ivars.d] / cs, 0, .5 / (cs * cs)]
-                Lvect[1, :ns] = [1., 0., 0., -1. / (cs * cs)]
-                Lvect[2, :ns] = [0., 0., 1., 0.]
-                Lvect[3, :ns] = [0., .5 * W_ij[ivars.d] / cs, 0., .5 / (cs * cs)]
-
-                Rvect[0, :ns] = [1, - cs / W_ij[ivars.d], 0, cs * cs]
-                Rvect[1, :ns] = [1., 0., 0., 0.,]
-                Rvect[2, :ns] = [0., 0., 1., 0.]
-                Rvect[3, :ns] = [1, cs / W_ij[ivars.d], 0, cs * cs]
-
-                ## For the additional scalar fields
-                Eigen[ns:] = W_ij[ivars.vy]
-                for n in prange(ns, ns + nadv):
-                    Lvect[n, n] = 1.
-                    Rvect[n, n] = 1.
+    return WL, WR
