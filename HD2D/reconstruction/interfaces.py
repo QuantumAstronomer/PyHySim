@@ -65,7 +65,7 @@ def PCM(grid, U, direction):
 
 
 @njit(cache = True, parallel = True)
-def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
+def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction, HLL_correction = False):
     """
     Project the cell-centered state onto the cell edge in
     one dimension using the second order piecewise linear
@@ -146,6 +146,10 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
           Adiabatic index of the fluid, to calculate the sound speed.
     direction : string ("x", "y")
           Direction in which we reconstruct the interface states.
+    HLL_correction : boolean
+          Specifies whether to include a correction term in the
+          interface states if the HLL family of Riemann solvers
+          is used.
 
         Returns:
     ----------------
@@ -252,10 +256,20 @@ def PLM(grid, W, dW, dt, ivars, nadv, gamma, direction):
     WL = W + lambdaL[:, :, np.newaxis] * dW + dWL
     WR = W - lambdaR[:, :, np.newaxis] * dW + dWR
 
+    if HLL_correction:
+        LCorr = np.zeros_like(CharL)
+        RCorr = np.zeros_like(CharR)
+        for i in prange(ilo - 2, ihi + 2):
+            for j in prange(jlo - 2, jhi + 2):
+                LCorr[i, j] = 
+
+        WL +=
+        WR +=
+
     return WL, WR
 
 @njit(cache = True, parallel = True)
-def PPMCW(grid, W, dWc, dWl, dWr, dt, ivars, nadv, gamma, direction):
+def PPMCW(grid, W, dWc, dWl, dWr, dt, ivars, nadv, gamma, direction, HLL_correction = False):
     """
     Third order piecewise parabolic interface reconstruction
     method described by Colella and Woodward (1984). The steps
@@ -324,6 +338,10 @@ def PPMCW(grid, W, dWc, dWl, dWr, dt, ivars, nadv, gamma, direction):
           Adiabatic index of the fluid, to calculate the sound speed.
     direction : string ("x", "y")
           Direction in which we reconstruct the interface states.
+    HLL_correction : boolean
+          Specifies whether to include a correction term in the
+          interface states if the HLL family of Riemann solvers
+          is used.
 
         Returns:
     ----------------
